@@ -1,18 +1,63 @@
 {
   "schemaVersion": 1,
+
   "world": {
     "w": 2400,
     "h": 1600,
     "bg": [235, 235, 235],
     "gridStep": 160
   },
+
   "camera": {
     "lerp": 0.12
   },
+
   "playerStart": {
-    "x": 300,
-    "y": 300,
+    "x": 1200,
+    "y": 800,
     "speed": 3
   },
-  "obstacles": [{ "x": 40, "y": 40, "w": 80, "h": 80, "r": 10 }]
+
+  "obstacles": [{ "x": 40, "y": 40, "w": 80, "h": 80, "r": 10 }],
+
+  "regions": {
+    "center": {
+      "type": "circle",
+      "x": 1200,
+      "y": 800,
+      "radius": 260,
+      "color": [230, 230, 230],
+      "playerSpeed": 3.0,
+      "camLerp": 0.12,
+      "camMode": "normal"
+    },
+
+    "north": {
+      "color": [205, 220, 235],
+      "playerSpeed": 2.2,
+      "camLerp": 0.05,
+      "camMode": "lag"
+    },
+
+    "east": {
+      "color": [235, 210, 210],
+      "playerSpeed": 3.6,
+      "camLerp": 0.22,
+      "camMode": "drift"
+    },
+
+    "south": {
+      "color": [210, 225, 210],
+      "playerSpeed": 3.0,
+      "camLerp": 0.08,
+      "camMode": "float"
+    },
+
+    "west": {
+      "color": [225, 215, 200],
+      "playerSpeed": 2.6,
+      "camLerp": 0.25,
+      "camMode": "tight"
+    }
+  }
 }

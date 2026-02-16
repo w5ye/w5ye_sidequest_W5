@@ -49,19 +49,42 @@ function draw() {
   // Keep player inside world
   player.x = constrain(player.x, 0, level.w);
   player.y = constrain(player.y, 0, level.h);
+  // Apply region behaviour
+  level.updateRegion(player.x, player.y);
+  level.applyRegionBehavior(player);
+  player.s = lerp(player.s, level.currentPlayerSpeed, 0.08);
 
-  // Target camera (center on player)
+  // Smoothly transition camera lerp
+  level.camLerp = lerp(level.camLerp, level.targetCamLerp, 0.05);
+  const camLerp = level.camLerp;
+
+  // Base target
   let targetX = player.x - width / 2;
   let targetY = player.y - height / 2;
 
-  // Clamp target camera safely
+  // --- camera behaviour modes ---
+  if (level.currentCamMode === "lag") {
+    targetX -= (player.x - camX - width / 2) * 0.2;
+    targetY -= (player.y - camY - height / 2) * 0.2;
+  }
+
+  if (level.currentCamMode === "drift") {
+    targetX += sin(frameCount * 0.02) * 40;
+    targetY += cos(frameCount * 0.015) * 30;
+  }
+
+  if (level.currentCamMode === "float") {
+    targetX += sin(frameCount * 0.01) * 20;
+    targetY += sin(frameCount * 0.008) * 20;
+  }
+
+  // Clamp camera
   const maxCamX = max(0, level.w - width);
   const maxCamY = max(0, level.h - height);
   targetX = constrain(targetX, 0, maxCamX);
   targetY = constrain(targetY, 0, maxCamY);
 
-  // Smooth follow using the JSON knob
-  const camLerp = level.camLerp; // ← data-driven now
+  // Smooth follow
   camX = lerp(camX, targetX, camLerp);
   camY = lerp(camY, targetY, camLerp);
 
