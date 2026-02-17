@@ -7,12 +7,16 @@ class WorldLevel {
     this.bg = json.world?.bg ?? [235, 235, 235];
     this.gridStep = json.world?.gridStep ?? 160;
 
-    this.obstacles = json.obstacles ?? [];
-
-    // NEW: camera tuning knob from JSON (data-driven)
-    this.camLerp = json.camera?.lerp ?? 0.12;
     this.regions = json.regions ?? {};
     this.activeRegion = "center";
+
+    this.obstacles = json.obstacles ?? [];
+    this.generateRandomObstaclesPerRegion();
+
+    // Camera tuning
+    this.camLerp = json.camera?.lerp ?? 0.12;
+
+    // Region display names
     this.regionNames = {
       center: "⚪ Stillness Circle",
       north: " 🔵Deep Sea",
@@ -22,15 +26,74 @@ class WorldLevel {
     };
   }
 
+  // --- generate random obstacles per wedge ---
+  generateRandomObstaclesPerRegion() {
+    const numObstaclesPerRegion = 12;
+    const center = this.regions.center;
+    if (!center) return;
+
+    // clear existing so they don't stack
+    this.obstacles = [];
+
+    const regionConfig = {
+      east: { shape: "circle", angleMin: -PI / 4, angleMax: PI / 4 },
+      south: { shape: "triangle", angleMin: PI / 4, angleMax: (3 * PI) / 4 },
+      north: { shape: "rect", angleMin: (-3 * PI) / 4, angleMax: -PI / 4 },
+      west: { shape: "circle", angleMin: (3 * PI) / 4, angleMax: (5 * PI) / 4 },
+    };
+
+    const maxRadius = dist(0, 0, this.w, this.h); // farthest possible
+
+    for (const key in regionConfig) {
+      const cfg = regionConfig[key];
+
+      for (let i = 0; i < numObstaclesPerRegion; i++) {
+        let x, y, size;
+        let tries = 0;
+
+        do {
+          const angle = random(cfg.angleMin, cfg.angleMax);
+          const radius = random(center.radius + 60, maxRadius);
+
+          x = center.x + cos(angle) * radius;
+          y = center.y + sin(angle) * radius;
+
+          size = random(40, 80);
+
+          tries++;
+          if (tries > 100) break;
+        } while (
+          // inside neutral circle
+          dist(x, y, center.x, center.y) < center.radius + size ||
+          // outside canvas bounds (ensure full shape fits)
+          x - size / 2 < 0 ||
+          x + size / 2 > this.w ||
+          y - size / 2 < 0 ||
+          y + size / 2 > this.h
+        );
+
+        this.obstacles.push({
+          x,
+          y,
+          w: size,
+          h: size,
+          shape: cfg.shape,
+          region: key,
+        });
+      }
+    }
+  }
+
+  // --- draw background ---
   drawBackground() {
     background(220);
   }
 
+  // --- draw world ---
   drawWorld() {
     noStroke();
     const r = this.regions[this.activeRegion];
     const col = r?.color ?? this.bg;
-
     fill(col[0], col[1], col[2]);
     rect(0, 0, this.w, this.h);
 
@@ -40,17 +103,24 @@ class WorldLevel {
     for (let y = 0; y <= this.h; y += this.gridStep) line(0, y, this.w, y);
 
     // --- obstacles ---
-    this.drawObstacles(); // call the new obstacle function
+    this.drawObstacles();
 
     // --- region wedges ---
     const center = this.regions.center;
-    const c = this.regions.center;
-    if (c) {
+    if (center) {
       const drawWedge = (startAngle, endAngle, col) => {
         push();
         noStroke();
         fill(col[0], col[1], col[2], 60);
-        arc(c.x, c.y, this.w * 2, this.h * 2, startAngle, endAngle, PIE);
+        arc(
+          center.x,
+          center.y,
+          this.w * 2,
+          this.h * 2,
+          startAngle,
+          endAngle,
+          PIE,
+        );
         pop();
       };
 
@@ -75,39 +145,48 @@ class WorldLevel {
     }
   }
 
-  // --- new helper function for obstacles ---
+  // --- draw obstacles ---
   drawObstacles() {
     for (const o of this.obstacles) {
       push();
       noStroke();
-      // Simple example: choose shape based on region key if you want
-      let shapeType = o.shape ?? "rect"; // default rectangle
-      switch (shapeType) {
+
+      switch (o.shape) {
         case "circle":
-          fill(200, 100, 100);
-          ellipse(o.x + o.w / 2, o.y + o.h / 2, o.w, o.h);
+          if (o.region === "west") {
+            fill(240, 210, 90, 100); // yellow west circles
+          } else {
+            fill(200, 100, 100, 100); // red east circles
+          }
+          ellipse(o.x, o.y, o.w, o.h);
           break;
+
         case "triangle":
-          fill(100, 200, 100);
+          fill(100, 200, 100, 100); // south
           triangle(o.x, o.y + o.h, o.x + o.w / 2, o.y, o.x + o.w, o.y + o.h);
           break;
-        default: // rectangle
-          fill(170, 190, 210);
+
+        case "rect":
+        default:
+          fill(170, 190, 210, 100); // north
           rect(o.x, o.y, o.w, o.h, o.r ?? 0);
           break;
       }
+
       pop();
     }
   }
 
+  // --- region behavior ---
   applyRegionBehavior(player) {
     const r = this.regions[this.activeRegion];
     if (!r) return;
-
     this.targetCamLerp = r.camLerp ?? this.camLerp;
     this.currentCamMode = r.camMode ?? "normal";
     this.currentPlayerSpeed = r.playerSpeed ?? player.s;
   }
+
+  // --- HUD ---
   drawHUD(player, camX, camY) {
     noStroke();
     fill(20);
@@ -118,22 +197,15 @@ class WorldLevel {
     textStyle(NORMAL);
     textFont("Courier New", 14);
     text(
-      "camLerp(JSON): " +
-        this.camLerp +
-        "  Player: " +
-        (player.x | 0) +
-        "," +
-        (player.y | 0) +
-        "  Cam: " +
-        (camX | 0) +
-        "," +
-        (camY | 0),
+      `camLerp(JSON): ${this.camLerp}  Player: ${player.x | 0},${player.y | 0}  Cam: ${camX | 0},${camY | 0}`,
       width / 2,
       50,
     );
     const regionName = this.regionNames[this.activeRegion] ?? this.activeRegion;
     text("Region: " + regionName, width / 2, 70);
   }
+
+  // --- update region based on player position ---
   updateRegion(px, py) {
     const center = this.regions.center;
     if (!center) return;
@@ -143,17 +215,13 @@ class WorldLevel {
     const distSq = dx * dx + dy * dy;
     const radius = center.radius;
 
-    // Inside neutral circle
     if (distSq <= radius * radius) {
       this.activeRegion = "center";
-      this.regionWeight = 1; // fully in center
+      this.regionWeight = 1;
       return;
     }
 
-    // Angle from center
-    const angle = atan2(dy, dx); // -PI to PI
-
-    // Determine primary region
+    const angle = atan2(dy, dx);
     let primary = "";
     if (angle >= -PI / 4 && angle < PI / 4) primary = "east";
     else if (angle >= PI / 4 && angle < (3 * PI) / 4) primary = "south";
@@ -162,9 +230,8 @@ class WorldLevel {
 
     this.activeRegion = primary;
 
-    // Smooth weight based on distance from center edge
-    const dist = sqrt(distSq) - radius; // distance outside neutral circle
-    const maxBlend = 150; // distance over which blending occurs
-    this.regionWeight = constrain(dist / maxBlend, 0, 1); // 0=center, 1=full region
+    const dist = sqrt(distSq) - radius;
+    const maxBlend = 150;
+    this.regionWeight = constrain(dist / maxBlend, 0, 1);
   }
 }
