@@ -50,8 +50,21 @@ function draw() {
   player.x = constrain(player.x, 0, level.w);
   player.y = constrain(player.y, 0, level.h);
   // Apply region behaviour
+  // Apply region behaviour
   level.updateRegion(player.x, player.y);
   level.applyRegionBehavior(player);
+  player.s = lerp(player.s, level.currentPlayerSpeed, 0.08);
+
+  // --- update player properties with smooth weight ---
+  const activeRegionData = level.regions[level.activeRegion];
+  if (activeRegionData) {
+    activeRegionData.key = level.activeRegion;
+    // pass regionWeight from WorldLevel for smooth blending
+    player.setRegionProperties(activeRegionData, level.regionWeight);
+  }
+
+  player.update(); // breathing size updated
+
   player.s = lerp(player.s, level.currentPlayerSpeed, 0.08);
 
   // Smoothly transition camera lerp

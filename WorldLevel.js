@@ -32,16 +32,17 @@ class WorldLevel {
     const col = r?.color ?? this.bg;
 
     fill(col[0], col[1], col[2]);
-
     rect(0, 0, this.w, this.h);
 
+    // --- grid ---
     stroke(245);
     for (let x = 0; x <= this.w; x += this.gridStep) line(x, 0, x, this.h);
     for (let y = 0; y <= this.h; y += this.gridStep) line(0, y, this.w, y);
 
-    noStroke();
-    fill(170, 190, 210);
-    for (const o of this.obstacles) rect(o.x, o.y, o.w, o.h, o.r ?? 0);
+    // --- obstacles ---
+    this.drawObstacles(); // call the new obstacle function
+
+    // --- region wedges ---
     const center = this.regions.center;
     const c = this.regions.center;
     if (c) {
@@ -59,6 +60,7 @@ class WorldLevel {
       drawWedge((3 * PI) / 4, (5 * PI) / 4, this.regions.west.color);
     }
 
+    // --- neutral circle boundary ---
     if (center) {
       push();
       noFill();
@@ -69,10 +71,35 @@ class WorldLevel {
       stroke(150, 150, 150, 25);
       strokeWeight(14);
       circle(center.x, center.y, center.radius * 2);
-
       pop();
     }
   }
+
+  // --- new helper function for obstacles ---
+  drawObstacles() {
+    for (const o of this.obstacles) {
+      push();
+      noStroke();
+      // Simple example: choose shape based on region key if you want
+      let shapeType = o.shape ?? "rect"; // default rectangle
+      switch (shapeType) {
+        case "circle":
+          fill(200, 100, 100);
+          ellipse(o.x + o.w / 2, o.y + o.h / 2, o.w, o.h);
+          break;
+        case "triangle":
+          fill(100, 200, 100);
+          triangle(o.x, o.y + o.h, o.x + o.w / 2, o.y, o.x + o.w, o.y + o.h);
+          break;
+        default: // rectangle
+          fill(170, 190, 210);
+          rect(o.x, o.y, o.w, o.h, o.r ?? 0);
+          break;
+      }
+      pop();
+    }
+  }
+
   applyRegionBehavior(player) {
     const r = this.regions[this.activeRegion];
     if (!r) return;
@@ -84,7 +111,12 @@ class WorldLevel {
   drawHUD(player, camX, camY) {
     noStroke();
     fill(20);
-    text("Mental Meditative World", 12, 20);
+    textAlign(CENTER);
+    textStyle(BOLD);
+    textFont("Courier New", 24);
+    text("Mental Meditative World", width / 2, 30);
+    textStyle(NORMAL);
+    textFont("Courier New", 14);
     text(
       "camLerp(JSON): " +
         this.camLerp +
@@ -96,11 +128,11 @@ class WorldLevel {
         (camX | 0) +
         "," +
         (camY | 0),
-      12,
-      40,
+      width / 2,
+      50,
     );
     const regionName = this.regionNames[this.activeRegion] ?? this.activeRegion;
-    text("Region: " + regionName, 12, 60);
+    text("Region: " + regionName, width / 2, 70);
   }
   updateRegion(px, py) {
     const center = this.regions.center;
@@ -109,25 +141,30 @@ class WorldLevel {
     const dx = px - center.x;
     const dy = py - center.y;
     const distSq = dx * dx + dy * dy;
+    const radius = center.radius;
 
-    // --- inside neutral circle ---
-    if (distSq <= center.radius * center.radius) {
+    // Inside neutral circle
+    if (distSq <= radius * radius) {
       this.activeRegion = "center";
+      this.regionWeight = 1; // fully in center
       return;
     }
 
-    // --- determine direction from center ---
+    // Angle from center
     const angle = atan2(dy, dx); // -PI to PI
 
-    // right = east, up = north (screen coords: y increases downward)
-    if (angle >= -PI / 4 && angle < PI / 4) {
-      this.activeRegion = "east";
-    } else if (angle >= PI / 4 && angle < (3 * PI) / 4) {
-      this.activeRegion = "south";
-    } else if (angle >= -(3 * PI) / 4 && angle < -PI / 4) {
-      this.activeRegion = "north";
-    } else {
-      this.activeRegion = "west";
-    }
+    // Determine primary region
+    let primary = "";
+    if (angle >= -PI / 4 && angle < PI / 4) primary = "east";
+    else if (angle >= PI / 4 && angle < (3 * PI) / 4) primary = "south";
+    else if (angle >= -(3 * PI) / 4 && angle < -PI / 4) primary = "north";
+    else primary = "west";
+
+    this.activeRegion = primary;
+
+    // Smooth weight based on distance from center edge
+    const dist = sqrt(distSq) - radius; // distance outside neutral circle
+    const maxBlend = 150; // distance over which blending occurs
+    this.regionWeight = constrain(dist / maxBlend, 0, 1); // 0=center, 1=full region
   }
 }
